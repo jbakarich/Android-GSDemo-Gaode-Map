@@ -29,7 +29,9 @@ import com.amap.api.maps2d.model.BitmapDescriptorFactory;
 import com.amap.api.maps2d.model.LatLng;
 import com.amap.api.maps2d.model.Marker;
 import com.amap.api.maps2d.model.MarkerOptions;
+import com.dji.mapkit.core.models.DJILatLng;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -270,19 +272,99 @@ public class MainActivity extends FragmentActivity implements View.OnClickListen
         return instance;
     }
 
+    private double DtoLat(double D, double Lat){
+
+
+        return D/(D/(111132.954 - 559.822 * Math.cos(Math.toRadians(2 * Lat)) + 1.175 * Math.cos(Math.toRadians(4 * Lat))));
+    }
+
+    private double DtoLong(double D, double Lat){
+        return D/(111132.954 * Math.cos(Math.toRadians(Lat)));
+    }
+
+    private void waypoint10(ArrayList<Double> Lat,  ArrayList<Double> Long, float L, float W, float Rmax, float Theta){
+//        setResultToToast("Trying To Build Raster Mission");
+
+        double newFirstLong = Long.get(0)-DtoLong(L/2,Lat.get(0))*Math.cos(Theta)+DtoLong(W/2,Lat.get(0))*Math.sin(Theta);
+        double newFirstLat = Lat.get(0)-DtoLat(L/2,Lat.get(0))*Math.sin(Theta)-DtoLat(W/2,Lat.get(0))*Math.cos(Theta);
+
+        Lat.set(0, newFirstLat);
+        Long.set(0, newFirstLong);
+
+        int repeat = (int) Math.ceil(L/Rmax);
+        float RL = L/(float)repeat;
+
+        for(int i = 0; i< (2 * repeat + 1); i++){
+            double newLat;
+            double newLng;
+            if(i%2 == 1){
+                newLat = Lat.get(i) + DtoLat(RL, Lat.get(i))* Math.sin(Theta);
+                newLng = Long.get(i) + DtoLong(RL, Lat.get(i+1))*Math.cos(Theta);
+
+                Lat.add(newLat);
+                Long.add(newLng);
+
+            } else if(i % 4 == 0){
+
+                newLat = Lat.get(i) + DtoLat(W, Lat.get(i))* Math.cos(Theta);
+                newLng = Long.get(i) - DtoLong(RL, Lat.get(i+1))*Math.sin(Theta);
+                Lat.add(newLat);
+                Long.add(newLng);
+
+            } else{
+
+                newLat = Lat.get(i) - DtoLat(W, Lat.get(i))* Math.cos(Theta);
+                newLng = Long.get(i) + DtoLong(RL, Lat.get(i+1))*Math.sin(Theta);
+                Lat.add(newLat);
+                Long.add(newLng);
+            }
+
+//            Waypoint newWaypoint = new Waypoint(newLat, newLng, altitude);
+//            waypointList.add(newWaypoint);
+            markWaypoint(new LatLng(newLat, newLng));
+            Log.d("WAT",Double.toString((newLat)));
+            setResultToToast(Double.toString(newLat));
+        }
+    }
+
+
     @Override
     public void onMapClick(LatLng point) {
         if (isAdd == true){
-            markWaypoint(point);
+//            markWaypoint(point);
+
+            ArrayList<Double> LatArrayList = new ArrayList<>();
+            ArrayList<Double> LngArrayList = new ArrayList<>();
+
+//            Lat = [33.8121]
+//            Long = [117.9190]
+//            LatFin = 33.8061
+//            LongFin = 117.9209
+            float L = 1000;
+            float W = 1000;
+            float Rmax = 25;
+            float Theta = 0;
+
+
+
+            LatArrayList.add((double)point.latitude);
+            LngArrayList.add((double)point.longitude);
+
+
+
             Waypoint mWaypoint = new Waypoint(point.latitude, point.longitude, altitude);
             //Add Waypoints to Waypoint arraylist;
             if (waypointMissionBuilder != null) {
-                waypointList.add(mWaypoint);
+
+
+                waypoint10(LatArrayList, LngArrayList, L, W, Rmax, Theta);
+//                waypointList.add(mWaypoint);
                 waypointMissionBuilder.waypointList(waypointList).waypointCount(waypointList.size());
             }else
             {
                 waypointMissionBuilder = new WaypointMission.Builder();
-                waypointList.add(mWaypoint);
+//                waypointList.add(mWaypoint);
+                waypoint10(LatArrayList, LngArrayList, L, W, Rmax, Theta);
                 waypointMissionBuilder.waypointList(waypointList).waypointCount(waypointList.size());
             }
         }else{
